@@ -290,15 +290,23 @@ function heuristicFindings(code: string): ModelFinding[] {
     }
 
     if (/JSON\.parse\s*\(/.test(line)) {
-      add("json-parse", index, {
-        title: "JSON.parse result is used without error handling",
-        severity: "medium",
-        category: "error-handling",
-        file: null,
-        explanation: "Malformed input throws a SyntaxError. Confirm the call is wrapped in try/catch and the parsed shape is validated.",
-        fix: "Catch parse failures, return a typed 4xx, and validate the parsed object with a schema.",
-        confidence: 0.55,
-      });
+      // Do not flag a parse that is already guarded by a nearby try/catch;
+      // that would be a false positive on ordinary defensive code.
+      const before = lines.slice(Math.max(0, index - 6), index).join("\n");
+      const after = lines.slice(index, index + 10).join("\n");
+      const guarded = /\btry\s*\{/.test(before) && /\bcatch\s*(\([^)]*\))?\s*\{/.test(after);
+
+      if (!guarded) {
+        add("json-parse", index, {
+          title: "JSON.parse result is used without error handling",
+          severity: "medium",
+          category: "error-handling",
+          file: null,
+          explanation: "Malformed input throws a SyntaxError. This call is not inside a visible try/catch, so a bad payload can surface as an unhandled 500.",
+          fix: "Catch parse failures, return a typed 4xx, and validate the parsed object with a schema.",
+          confidence: 0.55,
+        });
+      }
     }
 
     if (/catch\s*(\([^)]*\))?\s*\{\s*\}/.test(line)) {
@@ -364,7 +372,10 @@ function heuristicFindings(code: string): ModelFinding[] {
       });
     }
 
-    if (/[^=!<>]==[^=]/.test(line) && !/===/.test(line)) {
+    // `x == null` is a deliberate, idiomatic null-or-undefined check, so it is
+    // not reported. Other loose comparisons are.
+    const nullCheck = /[!=]=\s*(null|undefined)\b/.test(line);
+    if (/[^=!<>]==[^=]/.test(line) && !/===/.test(line) && !nullCheck) {
       add("loose-equality", index, {
         title: "Loose equality comparison",
         severity: "low",
