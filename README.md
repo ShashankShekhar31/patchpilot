@@ -86,11 +86,37 @@ pnpm typecheck   # tsc --noEmit
 pnpm build       # production build
 ```
 
+## Production credentials
+
+Alan's public documentation describes **no public inference API, no API-key issuance page, and no durable harness credential**. The `api.tryalan.ai/public/harness/v1` endpoint that PatchPilot's `alan` provider uses is configured by the Alan Code desktop agent and authenticated with a **session-scoped** key. That key is not a deployable credential and is not committed or shipped here.
+
+Alan's documented supported pattern for a durable open-model credential is **bring your own provider key**:
+
+- In Alan: **Settings → your team → Alan Agent → Custom provider** — pick an OpenCode-supported provider and paste your own provider API key.
+- In PatchPilot, point the server at a supported OpenAI-compatible endpoint with your own key.
+
+So for a deployed PatchPilot, use one of these (all server-side):
+
+```text
+# Option A - OpenRouter (hosted open models)
+PATCHPILOT_PROVIDER=openrouter
+OPENROUTER_API_KEY=<your OpenRouter key>
+OPENROUTER_MODEL=qwen/qwen3-coder
+
+# Option B - any OpenAI-compatible endpoint (vLLM, Ollama, LM Studio, Groq, Together)
+PATCHPILOT_PROVIDER=openai-compatible
+LLM_BASE_URL=https://<host>/v1
+LLM_MODEL=<model id>
+LLM_API_KEY=<your key>
+```
+
+`PATCHPILOT_PROVIDER=alan` with a durable `ALAN_API_KEY` remains supported if Alan provides you with one (for example through the hackathon team). Without a key, PatchPilot starts in **Sample mode**, clearly labelled everywhere, and makes no model request.
+
 ## Deploy to Vercel
 
-1. Import the repository in Vercel (framework preset: Next.js).
-2. Add the production environment variables: `PATCHPILOT_PROVIDER=alan`, `ALAN_API_KEY`, `ALAN_MODEL=deepseek/deepseek-v4.1-flash`, and `PATCHPILOT_MCP_TOKEN`.
-3. Deploy and verify `/api/status` shows `provider.kind=alan` and a successful review.
+1. Import the repository in Vercel (framework preset: Next.js, build command `pnpm build`).
+2. Add the production environment variables: `PATCHPILOT_PROVIDER` (`openrouter`, `openai-compatible`, or `alan`), the matching provider key and model id, and `PATCHPILOT_MCP_TOKEN`. See "Production credentials" above.
+3. Deploy, then verify `/api/status` reports `provider.kind` matching your provider and `provider.mode=live`, and run one live review.
 4. For the Alan MCP connector, use `https://<your-deployment>/api/mcp` with the bearer token.
 
 Do not claim deployment until the deployed URL has been verified.
